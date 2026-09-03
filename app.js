@@ -266,6 +266,62 @@ $('official').innerHTML = filterBar + filtered.map(s=>{
   }
 }
 
+  function renderOfficial() {
+  if(!officialScores.length) {
+    $('official').innerHTML='<div class="empty">No approved results yet.</div>';
+    return;
+  }
+
+  const sorted=[...officialScores].sort((a,b)=>{
+    const fa=fixtureFromKey(a.fixture_key), fb=fixtureFromKey(b.fixture_key);
+    return (fa?.ri??99)-(fb?.ri??99) || (fa?.gi??99)-(fb?.gi??99);
+  });
+
+  $('official').innerHTML=sorted.map(s=>{
+    const f=fixtureFromKey(s.fixture_key);
+
+    const adminEdit = isAdmin ? `
+      <div class="actions" style="margin-top:10px;align-items:end">
+        <label class="muted">${esc(s.home_player)}
+          <input class="edit-score-input"
+                 id="edit-home-${esc(s.fixture_key)}"
+                 type="number"
+                 min="0"
+                 max="99"
+                 value="${s.home_score}"
+                 style="width:72px;margin-left:6px">
+        </label>
+
+        <label class="muted">${esc(s.away_player)}
+          <input class="edit-score-input"
+                 id="edit-away-${esc(s.fixture_key)}"
+                 type="number"
+                 min="0"
+                 max="99"
+                 value="${s.away_score}"
+                 style="width:72px;margin-left:6px">
+        </label>
+
+        <button class="btn edit-official-btn"
+                data-key="${esc(s.fixture_key)}">
+          ✏️ Save Edit
+        </button>
+      </div>` : '';
+
+    return `<div class="submission">
+      <b>${esc(s.home_player)} ${s.home_score} – ${s.away_score} ${esc(s.away_player)}</b>
+      <div class="muted">${f ? 'Round '+f.roundNo : ''}</div>
+      ${watchButtons(s.fixture_key)}
+      ${adminEdit}
+    </div>`;
+  }).join('');
+
+  if(isAdmin) {
+    document.querySelectorAll('.edit-official-btn').forEach(b=>{
+      b.onclick=()=>editOfficialScore(b.dataset.key);
+    });
+  }
+}
 function pendingGroups() {
   const pending=submissions.filter(s=>s.status==='pending');
   const groups={};
