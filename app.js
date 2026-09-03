@@ -162,16 +162,58 @@ function renderStreams() {
 }
 
 function renderOfficial() {
-  if(!officialScores.length) { $('official').innerHTML='<div class="empty">No approved results yet.</div>'; return; }
+  if(!officialScores.length) {
+    $('official').innerHTML='<div class="empty">No approved results yet.</div>';
+    return;
+  }
+
   const sorted=[...officialScores].sort((a,b)=>{
     const fa=fixtureFromKey(a.fixture_key), fb=fixtureFromKey(b.fixture_key);
     return (fa?.ri??99)-(fb?.ri??99) || (fa?.gi??99)-(fb?.gi??99);
   });
+
   $('official').innerHTML=sorted.map(s=>{
     const f=fixtureFromKey(s.fixture_key);
-    return `<div class="submission"><b>${esc(s.home_player)} ${s.home_score} – ${s.away_score} ${esc(s.away_player)}</b>
-      <div class="muted">${f?'Round '+f.roundNo:''}</div>${watchButtons(s.fixture_key)}</div>`;
+
+    const adminEdit = isAdmin ? `
+      <div class="actions" style="margin-top:10px;align-items:end">
+        <label class="muted">${esc(s.home_player)}
+          <input id="edit-home-${esc(s.fixture_key)}"
+                 type="number"
+                 min="0"
+                 max="99"
+                 value="${s.home_score}"
+                 style="width:72px;margin-left:6px">
+        </label>
+
+        <label class="muted">${esc(s.away_player)}
+          <input id="edit-away-${esc(s.fixture_key)}"
+                 type="number"
+                 min="0"
+                 max="99"
+                 value="${s.away_score}"
+                 style="width:72px;margin-left:6px">
+        </label>
+
+        <button class="btn edit-official-btn"
+                data-key="${esc(s.fixture_key)}">
+          ✏️ Save Edit
+        </button>
+      </div>` : '';
+
+    return `<div class="submission">
+      <b>${esc(s.home_player)} ${s.home_score} – ${s.away_score} ${esc(s.away_player)}</b>
+      <div class="muted">${f ? 'Round '+f.roundNo : ''}</div>
+      ${watchButtons(s.fixture_key)}
+      ${adminEdit}
+    </div>`;
   }).join('');
+
+  if(isAdmin) {
+    document.querySelectorAll('.edit-official-btn').forEach(btn=>{
+      btn.onclick=()=>editOfficialScore(btn.dataset.key);
+    });
+  }
 }
 
 function pendingGroups() {
@@ -343,6 +385,74 @@ function setupRealtime() {
     .subscribe();
 }
 
+async function editOfficialScore(fixtureKeyValue) {
+  if(!isAdmin) {
+    return alert('Admin access is required to edit an official result.');
+  }
+
+  const current = officialScores.find(
+    s => s.fixture_key === fixtureKeyValue
+  );
+
+  if(!current) {
+    return alert('Official result not found.');
+  }
+
+  const homeInput = document.getElementById(
+    `edit-home-${fixtureKeyValue}`
+  );
+
+  const awayInput = document.getElementById(
+    `edit-away-${fixtureKeyValue}`
+  );
+
+  const hs = Number(homeInput?.value);
+  const as = Number(awayInput?.value);
+
+  if(
+    !Number.isInteger(hs) ||
+    !Number.isInteger(as) ||
+    hs < 0 ||
+    as < 0 ||
+    hs > 99 ||
+    as > 99
+  ) {
+    return alert('Please enter valid scores between 0 and 99.');
+  }
+
+  const f = fixtureFromKey(fixtureKeyValue);
+
+  const label = f
+    ? `${f.home} vs ${f.away}`
+    : fixtureKeyValue;
+
+  const confirmed = confirm(
+    `Change the official result for ${label} from ` +
+    `${current.home_score}-${current.away_score} to ${hs}-${as}?`
+  );
+
+  if(!confirmed) return;
+
+  const { data: { user } } = await db.auth.getUser();
+
+  const { error } = await db
+    .from('official_scores')
+    .update({
+      home_score: hs,
+      away_score: as,
+      approved_by: user?.id || current.approved_by || null,
+      approved_at: new Date().toISOString()
+    })
+    .eq('fixture_key', fixtureKeyValue);
+
+  if(error) {
+    return alert(error.message);
+  }
+
+  alert('Official result updated successfully.');
+
+  await loadData();
+}
 async function init() {
   setupTabs();
   populatePlayerSelect($('submitter'));
