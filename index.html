@@ -32,7 +32,7 @@ body{
   position:relative;
   overflow:hidden;
   color:white;
-  padding:42px 18px 34px;
+  padding:22px 18px 20px;
   background:
     radial-gradient(circle at 82% 20%,rgba(36,209,139,.28),transparent 28%),
     radial-gradient(circle at 18% 10%,rgba(11,99,206,.24),transparent 26%),
@@ -101,7 +101,7 @@ body{
 }
 .hero h1{
   margin:0;
-  font-size:clamp(34px,6vw,64px);
+  font-size:clamp(28px,5vw,46px);
   line-height:.98;
   letter-spacing:-.035em;
   max-width:850px;
@@ -117,7 +117,7 @@ body{
   display:grid;
   grid-template-columns:repeat(4,minmax(0,1fr));
   gap:10px;
-  margin-top:26px;
+  margin-top:14px;
   max-width:760px;
 }
 .hero-stat{
@@ -138,7 +138,7 @@ body{
   font-weight:700;
 }
 .hero-tagline{
-  margin-top:22px;
+  margin-top:12px;
   display:inline-flex;
   align-items:center;
   gap:8px;
@@ -270,7 +270,7 @@ select:focus,input:focus,textarea:focus{
 .quick-note{background:#eff6ff;border-left:4px solid #0b63ce;padding:10px 12px;border-radius:8px;margin:10px 0}
 
 @media(max-width:760px){
-  .hero{padding:32px 16px 28px}
+  .hero{padding:20px 16px 18px}
   .hero-stats{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
 @media(max-width:600px){
@@ -303,11 +303,10 @@ select:focus,input:focus,textarea:focus{
       and follow every battle for the Top 4.
     </p>
 
-    <div class="hero-stats">
-      <div class="hero-stat">
-        <strong>14</strong>
-        <span>Players</span>
-      </div>
+    <div class="hero-stat">
+  <strong id="heroLeader">—</strong>
+  <span>🥇 League Leader</span>
+</div>
 
       <div class="hero-stat">
         <strong>182</strong>
