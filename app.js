@@ -11,6 +11,10 @@ let submissions = [];
 let streamLinks = [];
 let isAdmin = false;
 
+let resultFilterPlayer = '';
+let resultFilterRound = '';
+let resultFilterSearch = '';
+
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
@@ -161,64 +165,122 @@ function renderStreams() {
   }
 }
 
-
-  function renderOfficial() {
-  if(!officialScores.length) {
-    $('official').innerHTML='<div class="empty">No approved results yet.</div>';
+function renderOfficial() {
+  if (!officialScores.length) {
+    $('official').innerHTML = '<div class="empty">No approved results yet.</div>';
     return;
   }
 
-  const sorted=[...officialScores].sort((a,b)=>{
-    const fa=fixtureFromKey(a.fixture_key), fb=fixtureFromKey(b.fixture_key);
-    return (fa?.ri??99)-(fb?.ri??99) || (fa?.gi??99)-(fb?.gi??99);
+  // Sort official results by round and fixture
+  const sorted = [...officialScores].sort((a, b) => {
+    const fa = fixtureFromKey(a.fixture_key);
+    const fb = fixtureFromKey(b.fixture_key);
+
+    return (fa?.ri ?? 99) - (fb?.ri ?? 99) ||
+           (fa?.gi ?? 99) - (fb?.gi ?? 99);
   });
 
-  $('official').innerHTML=sorted.map(s=>{
-    const f=fixtureFromKey(s.fixture_key);
+  // Apply player filter
+  const filtered = sorted.filter(s => {
+    return !resultFilterPlayer ||
+           s.home_player === resultFilterPlayer ||
+           s.away_player === resultFilterPlayer;
+  });
 
-    const adminEdit = isAdmin ? `
-      <div class="actions" style="margin-top:10px;align-items:end">
-        <label class="muted">${esc(s.home_player)}
-          <input class="edit-score-input"
-                 id="edit-home-${esc(s.fixture_key)}"
-                 type="number"
-                 min="0"
-                 max="99"
-                 value="${s.home_score}"
-                 style="width:72px;margin-left:6px">
-        </label>
+  // Player filter
+  const filterBar = `
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;align-items:end">
+      <label class="muted">
+        Player
+        <select id="result-player-filter">
+          <option value="">All Players</option>
+          ${players.map(p => `
+            <option value="${esc(p)}" ${resultFilterPlayer === p ? 'selected' : ''}>
+              ${esc(p)}
+            </option>
+          `).join('')}
+        </select>
+      </label>
+    </div>
+  `;
 
-        <label class="muted">${esc(s.away_player)}
-          <input class="edit-score-input"
-                 id="edit-away-${esc(s.fixture_key)}"
-                 type="number"
-                 min="0"
-                 max="99"
-                 value="${s.away_score}"
-                 style="width:72px;margin-left:6px">
-        </label>
+  const resultsHtml = filtered.length
+    ? filtered.map(s => {
+        const f = fixtureFromKey(s.fixture_key);
 
-        <button class="btn edit-official-btn"
-                data-key="${esc(s.fixture_key)}">
-          ✏️ Save Edit
-        </button>
-      </div>` : '';
+        const adminEdit = isAdmin ? `
+          <div class="actions" style="margin-top:10px;align-items:end">
+            <label class="muted">
+              ${esc(s.home_player)}
+              <input
+                class="edit-score-input"
+                id="edit-home-${esc(s.fixture_key)}"
+                type="number"
+                min="0"
+                max="99"
+                value="${s.home_score}"
+                style="width:72px;margin-left:6px"
+              >
+            </label>
 
-    return `<div class="submission">
-      <b>${esc(s.home_player)} ${s.home_score} – ${s.away_score} ${esc(s.away_player)}</b>
-      <div class="muted">${f ? 'Round '+f.roundNo : ''}</div>
-      ${watchButtons(s.fixture_key)}
-      ${adminEdit}
-    </div>`;
-  }).join('');
+            <label class="muted">
+              ${esc(s.away_player)}
+              <input
+                class="edit-score-input"
+                id="edit-away-${esc(s.fixture_key)}"
+                type="number"
+                min="0"
+                max="99"
+                value="${s.away_score}"
+                style="width:72px;margin-left:6px"
+              >
+            </label>
 
-  if(isAdmin) {
-    document.querySelectorAll('.edit-official-btn').forEach(b=>{
-      b.onclick=()=>editOfficialScore(b.dataset.key);
+            <button
+              class="btn edit-official-btn"
+              data-key="${esc(s.fixture_key)}"
+            >
+              ✏️ Save Edit
+            </button>
+          </div>
+        ` : '';
+
+        return `
+          <div class="submission">
+            <b>
+              ${esc(s.home_player)} ${s.home_score}
+              –
+              ${s.away_score} ${esc(s.away_player)}
+            </b>
+
+            <div class="muted">
+              ${f ? 'Round ' + f.roundNo : ''}
+            </div>
+
+            ${watchButtons(s.fixture_key)}
+            ${adminEdit}
+          </div>
+        `;
+      }).join('')
+    : '<div class="empty">No approved results found for this player.</div>';
+
+  $('official').innerHTML = filterBar + resultsHtml;
+
+  // Player filter event
+  $('result-player-filter')?.addEventListener('change', e => {
+    resultFilterPlayer = e.target.value;
+    renderOfficial();
+  });
+
+  // Admin edit buttons
+  if (isAdmin) {
+    document.querySelectorAll('.edit-official-btn').forEach(btn => {
+      btn.onclick = () => editOfficialScore(btn.dataset.key);
     });
   }
 }
-function pendingGroups() {
+
+  function pendingGroups() {
   const pending=submissions.filter(s=>s.status==='pending');
   const groups={};
   pending.forEach(s=>(groups[s.fixture_key] ||= []).push(s));
