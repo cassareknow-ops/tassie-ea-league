@@ -161,8 +161,58 @@ function renderStreams() {
   }
 }
 
-function renderOfficial() {
-  if(!officialScores.length) {
+const selectedPlayer = $('result-player-filter')?.value || '';
+const selectedRound = $('result-round-filter')?.value || '';
+const searchText = ($('result-search-filter')?.value || '').toLowerCase().trim();
+
+const filtered = sorted.filter(s => {
+  const f = fixtureFromKey(s.fixture_key);
+
+  const matchesPlayer =
+    !selectedPlayer ||
+    s.home_player === selectedPlayer ||
+    s.away_player === selectedPlayer;
+
+  const matchesRound =
+    !selectedRound ||
+    String(f?.roundNo || '') === selectedRound;
+
+  const matchesSearch =
+    !searchText ||
+    s.home_player.toLowerCase().includes(searchText) ||
+    s.away_player.toLowerCase().includes(searchText);
+
+  return matchesPlayer && matchesRound && matchesSearch;
+});
+
+$('official').innerHTML = filterBar + filtered.map(s=>{
+  if(!officialScores.length) {const filterBar = `
+  <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;align-items:end">
+    <label class="muted">
+      Player
+      <select id="result-player-filter">
+        <option value="">All Players</option>
+        ${players.map(p=>`<option value="${esc(p)}">${esc(p)}</option>`).join('')}
+      </select>
+    </label>
+
+    <label class="muted">
+      Round
+      <select id="result-round-filter">
+        <option value="">All Rounds</option>
+        ${Array.from({length:26},(_,i)=>`<option value="${i+1}">Round ${i+1}</option>`).join('')}
+      </select>
+    </label>
+
+    <label class="muted">
+      Search
+      <input id="result-search-filter"
+             type="text"
+             placeholder="Search player..."
+             style="min-width:180px">
+    </label>
+  </div>
+`;
     $('official').innerHTML='<div class="empty">No approved results yet.</div>';
     return;
   }
