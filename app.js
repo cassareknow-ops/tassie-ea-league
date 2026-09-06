@@ -285,13 +285,13 @@ function renderOfficial() {
     btn.onclick = () => editOfficialScore(btn.dataset.key);
   });
 
-  document.querySelectorAll('.return-unplayed-btn').forEach(btn => {
+   document.querySelectorAll('.return-unplayed-btn').forEach(btn => {
     btn.onclick = () => returnFixtureToUnplayed(btn.dataset.key);
   });
 }
+}
 
-  function pendingGroups() {
-  const pending=submissions.filter(s=>s.status==='pending');
+function pendingGroups() {  const pending=submissions.filter(s=>s.status==='pending');
   const groups={};
   pending.forEach(s=>(groups[s.fixture_key] ||= []).push(s));
   return groups;
