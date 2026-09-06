@@ -236,12 +236,19 @@ function renderOfficial() {
               >
             </label>
 
-            <button
-              class="btn edit-official-btn"
-              data-key="${esc(s.fixture_key)}"
-            >
-              ✏️ Save Edit
-            </button>
+          <button
+  class="btn edit-official-btn"
+  data-key="${esc(s.fixture_key)}"
+>
+  ✏️ Save Edit
+</button>
+
+<button
+  class="btn danger return-unplayed-btn"
+  data-key="${esc(s.fixture_key)}"
+>
+  ↩️ Return to Unplayed
+</button>
           </div>
         ` : '';
 
@@ -273,11 +280,14 @@ function renderOfficial() {
   });
 
   // Admin edit buttons
-  if (isAdmin) {
-    document.querySelectorAll('.edit-official-btn').forEach(btn => {
-      btn.onclick = () => editOfficialScore(btn.dataset.key);
-    });
-  }
+ if (isAdmin) {
+  document.querySelectorAll('.edit-official-btn').forEach(btn => {
+    btn.onclick = () => editOfficialScore(btn.dataset.key);
+  });
+
+  document.querySelectorAll('.return-unplayed-btn').forEach(btn => {
+    btn.onclick = () => returnFixtureToUnplayed(btn.dataset.key);
+  });
 }
 
   function pendingGroups() {
@@ -517,7 +527,47 @@ async function editOfficialScore(fixtureKeyValue) {
 
   await loadData();
 }
-async function init() {
+async function returnFixtureToUnplayed(fixtureKeyValue) {
+  if (!isAdmin) {
+    return alert('Admin access is required.');
+  }
+
+  const current = officialScores.find(
+    s => s.fixture_key === fixtureKeyValue
+  );
+
+  if (!current) {
+    return alert('Official result not found.');
+  }
+
+  const f = fixtureFromKey(fixtureKeyValue);
+
+  const label = f
+    ? `${f.home} vs ${f.away}`
+    : fixtureKeyValue;
+
+  const confirmed = confirm(
+    `Return ${label} to unplayed?\n\n` +
+    `The current result ${current.home_score}-${current.away_score} will be removed ` +
+    `from the league table and this fixture will become available again for submission.`
+  );
+
+  if (!confirmed) return;
+
+  const { error } = await db
+    .from('official_scores')
+    .delete()
+    .eq('fixture_key', fixtureKeyValue);
+
+  if (error) {
+    return alert(error.message);
+  }
+
+  alert('Match returned to unplayed successfully.');
+
+  await loadData();
+}
+  async function init() {
   setupTabs();
   populatePlayerSelect($('submitter'));
   populatePlayerSelect($('streamSubmitter'));
