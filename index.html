@@ -344,6 +344,11 @@ select:focus,input:focus,textarea:focus{
     <div class="card">
       <h2>Official League Table</h2>
       <p class="muted">Only scores approved by the league admin affect this table. Updates appear automatically.</p>
+      <div class="actions" style="margin-bottom:14px">
+        <button class="btn" id="copyTableImage">📸 Copy Table as Image</button>
+        <button class="btn alt" id="downloadTableImage">⬇️ Download PNG</button>
+      </div>
+      <div id="imageStatus"></div>
       <div class="tablewrap">
         <table>
           <thead><tr><th>POS</th><th>PLAYER</th><th>P</th><th>W</th><th>D</th><th>L</th><th>GF</th><th>GA</th><th>GD</th><th>PTS</th></tr></thead>
@@ -405,8 +410,8 @@ select:focus,input:focus,textarea:focus{
   </section>
 
   <section id="results" class="panel">
-    <div class="card"><h2>Official Results</h2><div id="official"></div></div>
-    <div class="card"><h2>Pending / Disputed Submissions</h2><p class="muted">Different scores submitted for the same fixture are flagged for the admin.</p><div id="pending"></div></div>
+    <div class="card"><h2>✅ Official Results</h2><div id="official"></div></div>
+    <div class="card"><h2>⏳ Pending / Disputed Submissions</h2><p class="muted">Different scores submitted for the same fixture are flagged for the admin.</p><div id="pending"></div></div>
   </section>
 
   <section id="admin" class="panel">
@@ -421,7 +426,7 @@ select:focus,input:focus,textarea:focus{
 
     <div id="adminArea" class="admin-only">
       <div class="card">
-        <h2>✅ Admin Approval Queue</h2>
+        <h2>⏳ Admin Approval Queue</h2>
         <div class="actions"><button class="btn alt" id="logout">Logout</button></div>
         <div id="queue"></div>
       </div>

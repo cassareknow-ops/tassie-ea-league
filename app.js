@@ -76,7 +76,8 @@ function rememberName(name) {
 function populateScoreFixtures() {
   const name = $('submitter').value;
   rememberName(name);
-  const list = allFixtures().filter(f=>!name || f.home===name || f.away===name);
+  const played = new Set(officialScores.map(s=>s.fixture_key));
+  const list = allFixtures().filter(f=>!played.has(f.key) && (!name || f.home===name || f.away===name));
   $('fixture').innerHTML = '<option value="">Select fixture</option>' + list.map(f=>`<option value="${f.key}">R${f.roundNo} · ${esc(f.home)} vs ${esc(f.away)}</option>`).join('');
   updateScoreLabels();
 }
@@ -103,6 +104,7 @@ async function loadData() {
   if(!scoresRes.error) officialScores = scoresRes.data || [];
   if(!subsRes.error) submissions = subsRes.data || [];
   if(!streamRes.error) streamLinks = streamRes.data || [];
+  populateScoreFixtures();
   renderAll();
 }
 
@@ -120,6 +122,8 @@ function calculateStandings() {
 }
 
 function renderStandings() {
+  const leader = officialScores.length ? calculateStandings()[0] : null;
+  if($('heroLeader')) $('heroLeader').textContent = leader ? leader.player : '—';
   $('standings').innerHTML = calculateStandings().map((s,i)=>`<tr class="${i<4?'top4':''}">
     <td>${i+1}</td><td class="player">${esc(s.player)}</td><td>${s.p}</td><td>${s.w}</td><td>${s.d}</td><td>${s.l}</td>
     <td>${s.gf}</td><td>${s.ga}</td><td>${s.gd>0?'+':''}${s.gd}</td><td><b>${s.pts}</b></td>
@@ -271,7 +275,7 @@ function renderOfficial() {
       }).join('')
     : '<div class="empty">No approved results found for this player.</div>';
 
-  $('official').innerHTML = filterBar + resultsHtml;
+  $('official').innerHTML = filterBar + (isAdmin ? '<p class="muted">These results are already approved. Use Save Edit to correct a score or Return to Unplayed to remove a mistaken result.</p>' : '') + resultsHtml;
 
   // Player filter event
   $('result-player-filter')?.addEventListener('change', e => {
@@ -291,7 +295,7 @@ function renderOfficial() {
 }
 }
 
-function pendingGroups() {  const pending=submissions.filter(s=>s.status==='pending');
+function pendingGroups() {  const pending=submissions.filter(s=>s.status==='pending' && !officialScores.some(o=>o.fixture_key===s.fixture_key));
   const groups={};
   pending.forEach(s=>(groups[s.fixture_key] ||= []).push(s));
   return groups;
@@ -315,7 +319,7 @@ function renderPending() {
 
 function renderAdminQueue() {
   if(!isAdmin) { $('queue').innerHTML=''; return; }
-  const pending=submissions.filter(s=>s.status==='pending');
+  const pending=submissions.filter(s=>s.status==='pending' && !officialScores.some(o=>o.fixture_key===s.fixture_key));
   if(!pending.length) { $('queue').innerHTML='<div class="empty">No pending submissions.</div>'; return; }
   $('queue').innerHTML=pending.map(s=>{
     const f=fixtureFromKey(s.fixture_key);
@@ -401,10 +405,11 @@ async function approveSubmission(id) {
     home_score:s.home_score,away_score:s.away_score,approved_submission_id:s.id,
     approved_by:user?.id || null,approved_at:new Date().toISOString()
   };
+  if(officialScores.some(o=>o.fixture_key===s.fixture_key)) return alert('This fixture already has an official result. Use Save Edit to correct it.');
   const up=await db.from('official_scores').upsert(scorePayload);
   if(up.error) return alert(up.error.message);
   const upd=await db.from('league_submissions').update({status:'approved',reviewed_at:new Date().toISOString(),reviewed_by:user?.id || null}).eq('id',id);
-  if(upd.error) return alert(upd.error.message);
+  if(upd.error) { await loadData(); return alert('The official score was saved, but the submission status could not be updated: '+upd.error.message); }
   await loadData();
 }
 
@@ -567,8 +572,66 @@ async function returnFixtureToUnplayed(fixtureKeyValue) {
 
   await loadData();
 }
-  async function init() {
+
+function leagueTableCanvas() {
+  const rows = calculateStandings();
+  const scale = 2, w = 1200, h = 310 + rows.length * 57 + 76;
+  const canvas = document.createElement('canvas');
+  canvas.width=w*scale; canvas.height=h*scale;
+  const c=canvas.getContext('2d'); c.scale(scale,scale);
+  const fill=(color,x,y,width,height)=>{c.fillStyle=color;c.fillRect(x,y,width,height);};
+  const text=(value,x,y,size=22,color='#0f172a',weight='400',align='left')=>{
+    c.fillStyle=color;c.font=`${weight} ${size}px Arial, sans-serif`;c.textAlign=align;
+    c.fillText(String(value),x,y);
+  };
+  fill('#f1f5f9',0,0,w,h);
+  fill('#102a43',0,0,w,220);
+  fill('#0b6e4f',0,0,12,220);
+  text('TASSIE MEN',42,69,43,'#ffffff','800');
+  text('EA LEAGUE',42,119,43,'#ffffff','800');
+  text('SEASON 1  •  OFFICIAL LEAGUE TABLE',44,163,19,'#a7f3d0','700');
+  text('Every match matters.',44,194,17,'#cbd5e1');
+  text(`${officialScores.length} / 182 MATCHES`,1158,72,22,'#ffffff','700','right');
+  text(`${Math.round(officialScores.length/182*100)}% COMPLETE`,1158,106,18,'#a7f3d0','700','right');
+  text('LIVE STANDINGS',42,265,25,'#102a43','800');
+  const cols=[['POS',62],['PLAYER',130],['P',540],['W',602],['D',664],['L',726],['GF',798],['GA',870],['GD',956],['PTS',1108]];
+  fill('#102a43',30,285,1140,53);
+  cols.forEach(([label,x],i)=>text(label,x,319,17,'#ffffff','700',i===1?'left':'center'));
+  rows.forEach((s,i)=>{
+    const y=338+i*57;
+    fill(i<4?'#dcfce7':i%2?'#f1f5f9':'#ffffff',30,y,1140,57);
+    if(i<4)fill('#16a36f',30,y,5,57);
+    const vals=[i+1,s.player,s.p,s.w,s.d,s.l,s.gf,s.ga,(s.gd>0?'+':'')+s.gd,s.pts];
+    vals.forEach((v,j)=>text(v,cols[j][1],y+36,j===1?20:19,j===9?'#0b6e4f':'#0f172a',j===1||j===9?'700':'400',j===1?'left':'center'));
+    fill('#e2e8f0',30,y+56,1140,1);
+  });
+  text('TOP 4 QUALIFY FOR THE PLAYOFFS',42,h-32,16,'#0b6e4f','700');
+  text('Tassie Men EA League • Season 1',1158,h-32,15,'#64748b','400','right');
+  return canvas;
+}
+async function exportLeagueTable(mode) {
+  const status=$('imageStatus');
+  try {
+    const canvas=leagueTableCanvas();
+    const blob=await new Promise((resolve,reject)=>canvas.toBlob(b=>b?resolve(b):reject(new Error('Could not create PNG.')),'image/png'));
+    if(mode==='copy') {
+      if(!navigator.clipboard?.write || !window.ClipboardItem) throw new Error('Image clipboard is unavailable in this browser. Please use Download PNG instead.');
+      await navigator.clipboard.write([new ClipboardItem({'image/png':blob})]);
+      setStatus(status,'Image copied! Open WhatsApp Web and press Ctrl + V.');
+    } else {
+      const url=URL.createObjectURL(blob);
+      const a=document.createElement('a');a.href=url;a.download='Tassie-Men-EA-League-Table.png';
+      document.body.appendChild(a);a.click();a.remove();
+      setTimeout(()=>URL.revokeObjectURL(url),60000);
+      setStatus(status,'PNG downloaded. You can share it on WhatsApp.');
+    }
+  } catch(e) { setStatus(status,e.message,false); }
+}
+
+async function init() {
   setupTabs();
+  $('copyTableImage').addEventListener('click',()=>exportLeagueTable('copy'));
+  $('downloadTableImage').addEventListener('click',()=>exportLeagueTable('download'));
   populatePlayerSelect($('submitter'));
   populatePlayerSelect($('streamSubmitter'));
   populateScoreFixtures();
